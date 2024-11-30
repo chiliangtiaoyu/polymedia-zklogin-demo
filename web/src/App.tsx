@@ -5,7 +5,6 @@ import { Transaction } from "@mysten/sui/transactions";
 import {
     genAddressSeed,
     generateNonce,
-    generateRandomness,
     getExtendedEphemeralPublicKey,
     getZkLoginSignature,
     jwtToAddress,
@@ -20,8 +19,8 @@ import "./App.less";
 
 import config from "./config.json"; // copy and modify config.example.json with your own values
 
-const NETWORK: NetworkName = "devnet";
-const MAX_EPOCH = 2; // keep ephemeral keys active for this many Sui epochs from now (1 epoch ~= 24h)
+const NETWORK: NetworkName = "localnet";
+// keep ephemeral keys active for this many Sui epochs from now (1 epoch ~= 24h)
 
 const suiClient = new SuiClient({
     url: getFullnodeUrl(NETWORK),
@@ -78,12 +77,19 @@ export const App: React.FC = () =>
         setModalContent(`🔑 Logging in with ${provider}...`);
 
         // Create a nonce
-        const { epoch } = await suiClient.getLatestSuiSystemState();
-        const maxEpoch = Number(epoch) + MAX_EPOCH; // the ephemeral key will be valid for MAX_EPOCH from now
-        const ephemeralKeyPair = new Ed25519Keypair();
-        const randomness = generateRandomness();
+        // const { epoch } = await suiClient.getLatestSuiSystemState();
+        const maxEpoch = 20; // the ephemeral key will be valid for MAX_EPOCH from now
+        const inputArray = [155, 244, 154, 106, 7, 85, 249, 83, 129, 31, 206, 18, 95, 38, 131, 213, 4, 41, 195, 187, 73, 224, 116, 20, 126, 0, 137, 165, 46, 174, 21, 95];
+        const uint8Array = new Uint8Array(inputArray);
+        const options = {skipValidation: false};
+        const ephemeralKeyPair = Ed25519Keypair.fromSecretKey(uint8Array, options);
+        console.log('maxEpoch:' + maxEpoch)
+        console.log('pub:' + ephemeralKeyPair.getPublicKey().toBase64())
+        console.log('pub1:' + ephemeralKeyPair.getPublicKey().toSuiPublicKey())
+        const randomness = '94854898718581193458284373993138886850';
+        console.log('randomness:'+randomness);
         const nonce = generateNonce(ephemeralKeyPair.getPublicKey(), maxEpoch, randomness);
-
+        console.log("nonce:"+nonce);
         // Save data to session storage so completeZkLogin() can use it after the redirect
         saveSetupData({
             provider,
@@ -93,43 +99,45 @@ export const App: React.FC = () =>
         });
 
         // Start the OAuth flow with the OpenID provider
-        const urlParamsBase = {
-            nonce: nonce,
-            redirect_uri: window.location.origin,
-            response_type: "id_token",
-            scope: "openid",
-        };
-        let loginUrl: string;
-        switch (provider) {
-            case "Google": {
-                const urlParams = new URLSearchParams({
-                    ...urlParamsBase,
-                    client_id: config.CLIENT_ID_GOOGLE,
-                });
-                loginUrl = `https://accounts.google.com/o/oauth2/v2/auth?${urlParams.toString()}`;
-                break;
-            }
-            case "Twitch": {
-                const urlParams = new URLSearchParams({
-                    ...urlParamsBase,
-                    client_id: config.CLIENT_ID_TWITCH,
-                    force_verify: "true",
-                    lang: "en",
-                    login_type: "login",
-                });
-                loginUrl = `https://id.twitch.tv/oauth2/authorize?${urlParams.toString()}`;
-                break;
-            }
-            case "Facebook": {
-                const urlParams = new URLSearchParams({
-                    ...urlParamsBase,
-                    client_id: config.CLIENT_ID_FACEBOOK,
-                });
-                loginUrl = `https://www.facebook.com/v19.0/dialog/oauth?${urlParams.toString()}`;
-                break;
-            }
-        }
-        window.location.replace(loginUrl);
+        // const urlParamsBase = {
+        //     nonce: nonce,
+        //     redirect_uri: window.location.origin,
+        //     response_type: "id_token",
+        //     scope: "openid",
+        // };
+        // let loginUrl: string;
+        // switch (provider) {
+        //     case "Google": {
+        //         const urlParams = new URLSearchParams({
+        //             ...urlParamsBase,
+        //             client_id: config.CLIENT_ID_GOOGLE,
+        //         });
+        //         loginUrl = `https://accounts.google.com/o/oauth2/v2/auth?${urlParams.toString()}`;
+        //         break;
+        //     }
+        //     case "Twitch": {
+        //         const urlParams = new URLSearchParams({
+        //             ...urlParamsBase,
+        //             client_id: config.CLIENT_ID_TWITCH,
+        //             force_verify: "true",
+        //             lang: "en",
+        //             login_type: "login",
+        //         });
+        //         loginUrl = `https://id.twitch.tv/oauth2/authorize?${urlParams.toString()}`;
+        //         break;
+        //     }
+        //     case "Facebook": {
+        //         const urlParams = new URLSearchParams({
+        //             ...urlParamsBase,
+        //             client_id: config.CLIENT_ID_FACEBOOK,
+        //         });
+        //         loginUrl = `https://www.facebook.com/v19.0/dialog/oauth?${urlParams.toString()}`;
+        //         break;
+        //     }
+        // }
+        // // window.location.replace(loginUrl);
+        // console.log(loginUrl)
+        await completeZkLogin()
     }
 
     /**
@@ -144,15 +152,15 @@ export const App: React.FC = () =>
         // https://docs.sui.io/concepts/cryptography/zklogin#decoding-jwt
 
         // grab the JWT from the URL fragment (the '#...')
-        const urlFragment = window.location.hash.substring(1);
-        const urlParams = new URLSearchParams(urlFragment);
-        const jwt = urlParams.get("id_token");
+        // const urlFragment = window.location.hash.substring(1);
+        // const urlParams = new URLSearchParams(urlFragment);
+        const jwt ='eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjEifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLnhvbmUuY29tIiwiYXpwIjoiMTExIiwiYXVkIjoiaHVpb25lIiwic3ViIjoiMjIyIiwibm9uY2UiOiJfMk9nX25TbUlXUUUyMERsMTl1c3AzdnhjMk0iLCJuYmYiOjI3MzI1MzM3MzgsImlhdCI6MjczMjUzMzczOCwiZXhwIjoyNzMyNTMzNzM4LCJqdGkiOiI5ODQ2N2Q2OTg3MjM4MjZmNzRhNTAyYmNkYmMyNzhjYWY2NGVkM2UwIn0.d9eqY9-zkQ3G2QZ7O4e8Zb2YumPqN1b_KFKmhjLREi-7oW9br1cOp1msN2DY5JjYjdjevKBT2HKH8qS7NUBoyjlugl6oXpTnUvarVYwMuMr9qVvyJBtEeXX8Cng4sLoRGYT0dDy2rmR8rHpGdxQaZWEkeJkS_HIIWu8jzo4bOu1dw7DQxmLwX3K84NZpJWT081oPp4gqzIyfGgvkJ58e_ICcfnSNvPqI3GAI4U9Ok4SLW6WNus-dN4RZ2qzzlf6gYP_e2nIcRtUapyC4rCnq7Fw4KxlSwa8mc2nOeyYlCa2Pl7JRh7U1wj_341SCvebdgxmu4R45G7EW79dKu9DRrA';
         if (!jwt) {
             return;
         }
 
         // remove the URL fragment
-        window.history.replaceState(null, "", window.location.pathname);
+        // window.history.replaceState(null, "", window.location.pathname);
 
         // decode the JWT
         const jwtPayload = jwtDecode(jwt);
@@ -166,27 +174,27 @@ export const App: React.FC = () =>
 
         const requestOptions =
             config.URL_SALT_SERVICE === "/dummy-salt-service.json"
-            ? // dev, using a JSON file (same salt all the time)
-            {
-                method: "GET",
-            }
-            : // prod, using an actual salt server
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ jwt }),
-            };
+                ? // dev, using a JSON file (same salt all the time)
+                {
+                    method: "GET",
+                }
+                : // prod, using an actual salt server
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ jwt }),
+                };
 
         const saltResponse: { salt: string } | null =
             await fetch(config.URL_SALT_SERVICE, requestOptions)
-            .then(res => {
-                console.debug("[completeZkLogin] salt service success");
-                return res.json();
-            })
-            .catch((error: unknown) => {
-                console.warn("[completeZkLogin] salt service error:", error);
-                return null;
-            });
+                .then(res => {
+                    console.debug("[completeZkLogin] salt service success");
+                    return res.json();
+                })
+                .catch((error: unknown) => {
+                    console.warn("[completeZkLogin] salt service error:", error);
+                    return null;
+                });
 
         if (!saltResponse) {
             return;
@@ -197,7 +205,10 @@ export const App: React.FC = () =>
         // === Get a Sui address for the user ===
         // https://docs.sui.io/concepts/cryptography/zklogin#get-the-users-sui-address
 
+        console.log('userSalt:' + userSalt)
+        console.log('genAddressSeed:' + genAddressSeed(userSalt, 'sub', jwtPayload.sub, 'huione'))
         const userAddr = jwtToAddress(jwt, userSalt);
+        console.log('userAddr:' + userAddr)
 
         // === Load and clear the data which beginZkLogin() created before the redirect ===
         const setupData = loadSetupData();
@@ -235,22 +246,22 @@ export const App: React.FC = () =>
             headers: { "Content-Type": "application/json" },
             body: payload,
         })
-        .then(res => {
-            console.debug("[completeZkLogin] ZK proving service success");
-            return res.json();
-        })
-        .catch((error: unknown) => {
-            console.warn("[completeZkLogin] ZK proving service error:", error);
-            return null;
-        })
-        .finally(() => {
-            setModalContent("");
-        });
+            .then(res => {
+                console.debug("[completeZkLogin] ZK proving service success");
+                return res.json();
+            })
+            .catch((error: unknown) => {
+                console.warn("[completeZkLogin] ZK proving service error:", error);
+                return null;
+            })
+            .finally(() => {
+                setModalContent("");
+            });
 
         if (!zkProofs) {
             return;
         }
-
+        console.log('------')
         // === Save data to session storage so sendTransaction() can use it ===
         saveAccount({
             provider: setupData.provider,
@@ -308,17 +319,17 @@ export const App: React.FC = () =>
                 showEffects: true,
             },
         })
-        .then(result => {
-            console.debug("[sendTransaction] executeTransactionBlock response:", result);
-            fetchBalances([account]);
-        })
-        .catch((error: unknown) => {
-            console.warn("[sendTransaction] executeTransactionBlock failed:", error);
-            return null;
-        })
-        .finally(() => {
-            setModalContent("");
-        });
+            .then(result => {
+                console.debug("[sendTransaction] executeTransactionBlock response:", result);
+                fetchBalances([account]);
+            })
+            .catch((error: unknown) => {
+                console.warn("[sendTransaction] executeTransactionBlock failed:", error);
+                return null;
+            })
+            .finally(() => {
+                setModalContent("");
+            });
     }
 
     /**
@@ -399,93 +410,93 @@ export const App: React.FC = () =>
         ? ["Google", "Twitch", "Facebook"]
         : ["Google", "Twitch"]; // Facebook requires business verification to publish the app
     return (
-    <div id="page">
+        <div id="page">
 
-        <Modal content={modalContent} />
+            <Modal content={modalContent} />
 
-        <div id="logos">
-            <LinkExternal href="https://polymedia.app" follow={true}>
-                <img alt="polymedia" src="https://assets.polymedia.app/img/all/logo-nomargin-transparent-512x512.webp" className="icon" />
-            </LinkExternal>
+            <div id="logos">
+                <LinkExternal href="https://polymedia.app" follow={true}>
+                    <img alt="polymedia" src="https://assets.polymedia.app/img/all/logo-nomargin-transparent-512x512.webp" className="icon" />
+                </LinkExternal>
 
-            <LinkExternal href="https://github.com/juzybits/polymedia-zklogin-demo" follow={true}>
-                <GitHubLogo />
-            </LinkExternal>
-        </div>
+                <LinkExternal href="https://github.com/juzybits/polymedia-zklogin-demo" follow={true}>
+                    <GitHubLogo />
+                </LinkExternal>
+            </div>
 
-        <div id="network-indicator">
-            <label>{NETWORK}</label>
-        </div>
+            <div id="network-indicator">
+                <label>{NETWORK}</label>
+            </div>
 
-        <h1>Sui zkLogin demo</h1>
+            <h1>Sui zkLogin demo</h1>
 
-        <div id="login-buttons" className="section">
-            <h2>Log in:</h2>
-            {openIdProviders.map(provider =>
-                <button
-                    className={`btn-login ${provider}`}
-                    onClick={() => {beginZkLogin(provider);} }
-                    key={provider}
-                >
-                    {provider}
-                </button>
-            )}
-        </div>
-
-        { accounts.current.length > 0 &&
-        <div id="accounts" className="section">
-            <h2>Accounts:</h2>
-            {accounts.current.map(acct => {
-                const balance = balances.get(acct.userAddr);
-                const explorerLink = makePolymediaUrl(NETWORK, "address", acct.userAddr);
-                return (
-                <div className="account" key={acct.userAddr}>
-                    <div>
-                        <label className={`provider ${acct.provider}`}>{acct.provider}</label>
-                    </div>
-                    <div>
-                        Address: <a target="_blank" rel="noopener noreferrer" href={explorerLink}>
-                            {shortenSuiAddress(acct.userAddr)}
-                        </a>
-                    </div>
-                    <div>User ID: {acct.sub}</div>
-                    <div>Balance: {typeof balance === "undefined" ? "(loading)" : `${balance} SUI`}</div>
+            <div id="login-buttons" className="section">
+                <h2>Log in:</h2>
+                {openIdProviders.map(provider =>
                     <button
-                        className={`btn-send ${!balance ? "disabled" : ""}`}
-                        disabled={!balance}
-                        onClick={() => {sendTransaction(acct);}}
+                        className={`btn-login ${provider}`}
+                        onClick={() => {beginZkLogin(provider);} }
+                        key={provider}
                     >
-                        Send transaction
+                        {provider}
                     </button>
-                    { balance === 0 &&
-                        <button
-                            className="btn-faucet"
-                            onClick={() => {
-                                requestSuiFromFaucet(NETWORK, acct.userAddr);
-                                setModalContent("💰 Requesting SUI from faucet. This will take a few seconds...");
-                                setTimeout(() => { setModalContent(""); }, 3000);
-                            }}
-                        >
-                            Use faucet
-                        </button>
-                    }
-                    <hr/>
+                )}
+            </div>
+
+            { accounts.current.length > 0 &&
+                <div id="accounts" className="section">
+                    <h2>Accounts:</h2>
+                    {accounts.current.map(acct => {
+                        const balance = balances.get(acct.userAddr);
+                        const explorerLink = makePolymediaUrl(NETWORK, "address", acct.userAddr);
+                        return (
+                            <div className="account" key={acct.userAddr}>
+                                <div>
+                                    <label className={`provider ${acct.provider}`}>{acct.provider}</label>
+                                </div>
+                                <div>
+                                    Address: <a target="_blank" rel="noopener noreferrer" href={explorerLink}>
+                                    {shortenSuiAddress(acct.userAddr)}
+                                </a>
+                                </div>
+                                <div>User ID: {acct.sub}</div>
+                                <div>Balance: {typeof balance === "undefined" ? "(loading)" : `${balance} SUI`}</div>
+                                <button
+                                    className={`btn-send ${!balance ? "disabled" : ""}`}
+                                    disabled={!balance}
+                                    onClick={() => {sendTransaction(acct);}}
+                                >
+                                    Send transaction
+                                </button>
+                                { balance === 0 &&
+                                    <button
+                                        className="btn-faucet"
+                                        onClick={() => {
+                                            requestSuiFromFaucet(NETWORK, acct.userAddr);
+                                            setModalContent("💰 Requesting SUI from faucet. This will take a few seconds...");
+                                            setTimeout(() => { setModalContent(""); }, 3000);
+                                        }}
+                                    >
+                                        Use faucet
+                                    </button>
+                                }
+                                <hr/>
+                            </div>
+                        );
+                    })}
                 </div>
-                );
-            })}
-        </div>
-        }
+            }
 
-        <div className="section">
-            <button
-                className="btn-clear"
-                onClick={() => { clearState(); }}
-            >
-                🧨 CLEAR STATE
-            </button>
-        </div>
+            <div className="section">
+                <button
+                    className="btn-clear"
+                    onClick={() => { clearState(); }}
+                >
+                    🧨 CLEAR STATE
+                </button>
+            </div>
 
-    </div>
+        </div>
     );
 };
 

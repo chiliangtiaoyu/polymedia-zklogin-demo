@@ -1,5 +1,5 @@
 {
-    "URL_ZK_PROVER": "https://prover-dev.mystenlabs.com/v1",
+    "URL_ZK_PROVER": "https://prover-testnet.huione.org/v1",
     "URL_SALT_SERVICE": "/dummy-salt-service.json",
     "CLIENT_ID_GOOGLE": "YOUR_GOOGLE_CLIENT_ID",
     "CLIENT_ID_TWITCH": "YOUR_TWITCH_CLIENT_ID",
