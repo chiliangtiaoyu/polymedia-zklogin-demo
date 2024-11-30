@@ -23,7 +23,7 @@ const NETWORK: NetworkName = "localnet";
 // keep ephemeral keys active for this many Sui epochs from now (1 epoch ~= 24h)
 
 const suiClient = new SuiClient({
-    url: getFullnodeUrl(NETWORK),
+    url: "http://47.129.42.230:9000",
 });
 
 /* Session storage keys */
